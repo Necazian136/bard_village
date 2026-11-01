@@ -1,0 +1,48 @@
+body {
+    background: linear-gradient(45deg, rgba(24,110,129,1) 0%, rgba(35,118,63,1) 100%);
+    margin: 0;
+}
+
+#app {
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.prevent-select {
+    -webkit-user-select: none; /* Safari */
+    -ms-user-select: none; /* IE 10 and IE 11 */
+    user-select: none; /* Standard syntax */
+}
+
+.meow-font {
+    color: #FFF;
+    text-align: center;
+    font-family: MeowScript-Regular, sans-serif;
+    font-size: 72px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: normal;
+}
+
+.baloo-font {
+    color: #FFF;
+    text-align: center;
+    font-family: Baloo, sans-serif;
+    font-size: 72px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: normal;
+}
+
+@font-face {
+    font-family: MeowScript-Regular;
+    src: url('@/assets/fonts/MeowScript-Regular.ttf');
+}
+
+@font-face {
+    font-family: Baloo;
+    src: url('@/assets/fonts/baloo-cyrillic.ttf');
+}

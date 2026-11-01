@@ -1,0 +1,197 @@
+<script src="https://yandex.ru/games/sdk/v2"></script>
+<script>
+    let ysdk = null;
+    let lb = null;
+    let player = null;
+    let setUserDataTimeout = null;
+    let setLeaderboardScoreTimeout = null;
+    let leaderboardData = null;
+    let getLeaderboardDataTimeout = null;
+    let canUpdateLeaderboardData = true;
+    let was_hidden = document.hidden
+
+    YaGames.init().then(_ysdk => {
+        window.ysdk = _ysdk;
+        ysdk = _ysdk
+        ysdk.getLeaderboards()
+            .then(_lb => {
+                lb = _lb
+            });
+    });
+
+    function ShowAd(callback) {
+        ysdk.adv.showFullscreenAdv({
+            callbacks: {
+                onClose: function (wasShown) {
+                    callback(true);
+                    console.log('Ad!');
+                },
+                onError: function (error) {
+                    callback(false);
+                    console.log('Ad Error:', error);
+                }
+            }
+        })
+    }
+
+    function GetLang(_callback) {
+        if (!ysdk) {
+            setTimeout(() => GetLang(_callback), 50);
+            return;
+        }
+        _callback(window.ysdk.environment.i18n.lang)
+    }
+
+    function Ready() {
+        if (!ysdk) {
+            setTimeout(() => Ready(), 50);
+            return;
+        }
+        ysdk.features.LoadingAPI?.ready();
+        console.log('Ready!');
+    }
+
+    function Start() {
+        if (!ysdk) {
+            setTimeout(() => Start(), 50);
+            return;
+        }
+        console.log('Start!');
+        ysdk.features.GameplayAPI.start();
+    }
+
+    function Stop() {
+        if (!ysdk) {
+            setTimeout(() => Stop(), 50);
+            return;
+        }
+        console.log('Stop!');
+        if (!ysdk) {
+            setTimeout(() => Stop(), 50);
+            return;
+        }
+        ysdk.features.GameplayAPI.stop();
+    }
+
+    function GetUserData(scopes, _callback) {
+        if (!ysdk) {
+            setTimeout(() => GetUserData(scopes, _callback), 50);
+            return;
+        }
+        console.log('Get User Data!');
+        ysdk.getPlayer({scopes: scopes}).then(_player => {
+            player = _player;
+            player.getData().then((data) => {
+                console.log(data);
+                _callback(data);
+            });
+        }).catch(err => {
+            _callback({});
+        });
+    }
+
+    function _sendUserData(data) {
+        console.log('Set User Data!');
+        console.log(data);
+        if (!player) {
+            return;
+        }
+        player.setData(data, false);
+    }
+
+    function SetUserData(data) {
+        if (setUserDataTimeout) {
+            clearTimeout(setUserDataTimeout);
+        }
+        setUserDataTimeout = setTimeout(() => _sendUserData(data), 5000)
+    }
+
+    function _setLeaderboardScore(score) {
+        lb.setLeaderboardScore('leaderboard', score);
+    }
+
+    function SetLeaderboardScore(score) {
+        if (!lb) {
+            setTimeout(() => SetLeaderboardScore(score), 50);
+            return;
+        }
+        if (setLeaderboardScoreTimeout) {
+            clearTimeout(setLeaderboardScoreTimeout);
+        }
+        setLeaderboardScoreTimeout = setTimeout(() => _setLeaderboardScore(score), 3000)
+    }
+
+    function GetLeaderboard(forced, _callback) {
+        if (!lb) {
+            setTimeout(() => GetLeaderboard(_callback), 50);
+            return;
+        }
+        if (!canUpdateLeaderboardData && !forced) {
+            console.log('Get Leaderboard from cache!');
+            _callback(leaderboardData)
+            return;
+        }
+        console.log('Get Leaderboard!');
+        lb.getLeaderboardEntries('leaderboard', { quantityTop: 1, includeUser: true, quantityAround: 6 })
+            .then(res => {
+                leaderboardData = res
+                canUpdateLeaderboardData = false
+                if (getLeaderboardDataTimeout) {
+                    clearTimeout(getLeaderboardDataTimeout);
+                }
+                getLeaderboardDataTimeout = setTimeout(() => canUpdateLeaderboardData = true, 30000);
+                console.log(res)
+                _callback(res.slice(0, 6))
+            }).catch(() => {
+                lb.getLeaderboardEntries('leaderboard', { quantityTop: 6 })
+                .then(res => {
+                    leaderboardData = res
+                    canUpdateLeaderboardData = false
+                    if (getLeaderboardDataTimeout) {
+                        clearTimeout(getLeaderboardDataTimeout);
+                    }
+                    getLeaderboardDataTimeout = setTimeout(() => canUpdateLeaderboardData = true, 30000);
+                    console.log(res)
+                    _callback(res.slice(0, 6))
+                }).catch(() => {
+                    _callback({entries: []})
+                });
+            });
+    }
+
+    function _check_is_hidden(callback) {
+        if (!document.hidden && was_hidden) {
+            was_hidden = false
+            console.log('tab open')
+            callback(true)
+        }
+        if (document.hidden && !was_hidden) {
+            was_hidden = true
+            console.log('tab closed')
+            callback(false)
+        }
+    }
+
+    function ListenFocusEvent(callback) {
+        const canvas = document.getElementById("canvas");
+
+        setInterval(() => _check_is_hidden(callback), 50);
+    }
+
+    window.ListenFocusEvent = ListenFocusEvent;
+    window.SetLeaderboardScore = SetLeaderboardScore;
+    window.GetLeaderboard = GetLeaderboard;
+    window.ShowAd = ShowAd;
+    window.Ready = Ready;
+    window.Start = Start;
+    window.Stop = Stop;
+    window.GetUserData = GetUserData;
+    window.SetUserData = SetUserData;
+</script>
+
+<style>
+    #canvas {
+        height: 100% !important;
+        width: 100% !important;
+    }
+</style>
