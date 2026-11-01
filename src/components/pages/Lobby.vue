@@ -3,8 +3,8 @@
     <Parser
       @onParse="onParse"
     />
-    <Stave
-      ref="stave"
+    <Game
+      ref="game"
     />
   </div>
 </template>
@@ -14,19 +14,15 @@
 import Button from "@/components/elements/Button.vue";
 import Input from "@/components/elements/Input.vue";
 import Parser from "@/components/parser/Parser.vue";
-import Stave from "@/components/elements/Stave.vue";
+import Game from "@/components/game/Game.vue";
 
 export default {
   name: "Lobby",
-  components: {Stave, Parser, Input, Button},
+  components: {Game, Parser, Input, Button},
   methods: {
     onParse(data) {
       console.log(data);
-      this.$refs.stave.setTracks(data.tracks);
-      this.$refs.stave.setSamplers(data.samplers);
-      this.$refs.stave.setMidi(data.midi);
-      this.$refs.stave.setSpeed(data.midi.header.tempos[0].bpm);
-      this.$refs.stave.createNotes(data.midi.header.ppq);
+      this.$refs.game.load(data);
     }
   }
 }
@@ -37,7 +33,6 @@ export default {
 .lobby {
   &.container {
     width: 1082px;
-    height: 698px;
     margin: 16px 8px;
 
     border: 4px solid rgba(29, 29, 27, 0.15);

@@ -1,7 +1,8 @@
 <template>
-  <div>
-    <input @change="parseFromUploadedFile" class="hidden" type="file" ref="midi-file">
-    <Button @click="selectFile">Upload File</Button>
+  <div class="parser">
+    <input @change="parseFromUploadedFile" class="hidden" type="file" accept=".mid,.midi" ref="midi-file">
+    <Button @click="selectFile">Загрузить .mid</Button>
+    <Button @click="loadDemo">Демо</Button>
   </div>
 </template>
 
@@ -27,6 +28,9 @@ export default {
     },
     selectFile() {
       this.$refs['midi-file'].click();
+    },
+    loadDemo() {
+      this.parseFromUrl('/demo.mid');
     },
     parseFromUploadedFile() {
       const url = URL.createObjectURL(this.$refs['midi-file'].files[0]);
@@ -121,6 +125,20 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+.parser {
+  display: flex;
+  gap: 12px;
+  padding: 10px 12px 0;
+
+  & :deep(.placeholder) {
+    height: 60px;
+  }
+
+  & :deep(.meow-font) {
+    font-size: 34px;
+  }
+}
+
 .hidden {
   visibility: hidden;
 }

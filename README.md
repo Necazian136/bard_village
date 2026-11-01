@@ -1,40 +1,58 @@
-# client
+# bard_village — игра на MIDI в стиле Trombone Champ
 
-This template should help get you started developing with Vue 3 in Vite.
+Клиент на Vue 3 + Vite + PixiJS + Tone.js. Можно загрузить `.mid` файл
+(или нажать **Демо** — загрузится `public/demo.mid`) и сыграть его как игру.
 
-## Recommended IDE Setup
+## Как играть
 
-[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur) + [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin).
+1. Загрузите `.mid` (кнопка **Загрузить .mid**) или нажмите **Демо**.
+2. Выберите дорожку (инструмент), которую будете играть — остальные дорожки
+   зазвучат сами как аккомпанемент.
+3. Нажмите **Играть**.
+4. **Мышь по вертикали** — высота, на которой вы «стоите» (нота подписана у курсора).
+5. **Любая клавиша** в момент, когда нота доехала до жёлтой линии слева, — сыграть ноту.
 
-## Type Support for `.vue` Imports in TS
+### Раскладка нот
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin) to make the TypeScript language service aware of `.vue` types.
+- По оси **X** — время проигрывания (ноты едут справа налево).
+- По оси **Y** — высота ноты, вертикально по октавам (октавы подписаны, напр. `C4`).
+- Длинные ноты — «труба» от начала до конца; короткие — один кружок.
 
-If the standalone TypeScript plugin doesn't feel fast enough to you, Volar has also implemented a [Take Over Mode](https://github.com/johnsoncodehk/volar/discussions/471#discussioncomment-1361669) that is more performant. You can enable it by the following steps:
+### Аккорды и своя высота
 
-1. Disable the built-in TypeScript Extension
-    1) Run `Extensions: Show Built-in Extensions` from VSCode's command palette
-    2) Find `TypeScript and JavaScript Language Features`, right click and select `Disable (Workspace)`
-2. Reload the VSCode window by running `Developer: Reload Window` from the command palette.
+- Все ноты, звучащие в один момент, — один аккорд (соединены линией).
+  Чтобы сыграть аккорд из N нот, нажмите **N клавиш** в окне попадания.
+- Высота аккорда отмеряется по **самой низкой ноте** аккорда.
+- Вы звучите не «как в midi», а на **своей высоте**: весь аккорд сдвигается на
+  `высота игрока − самая низкая нота аккорда`. Даже если не попали в ноту аккорда,
+  каждая его нота сдвигается на соответствующее значение.
+- Оценка: `PERFECT!` (сдвиг 0), `GOOD!` (до 2 полутонов), `NASTY!` (дальше) —
+  очки и комбо; без нажатия — `MISS`.
 
-## Customize configuration
+## Архитектура
 
-See [Vite Configuration Reference](https://vitejs.dev/config/).
+- `src/components/game/GameEngine.ts` — чистая логика (без Pixi/Tone): ноты midi
+  группируются в события-аккорды, принимаются нажатия (`blow`), считается
+  попадание/очки. Готова к мультиплееру: по сети можно слать только `blow`
+  и результаты судейства.
+- `src/components/game/GameField.ts` — PixiJS-поле: фон, сетка октав, жёлтая линия,
+  ноты, курсор от мыши, надписи оценок.
+- `src/components/game/Game.vue` — обвязка: выбор инструмента, HUD (очки/комбо),
+  звук через сэмплеры из `public/sound/*.json` (Tone.Sampler), аккомпанемент.
+- `src/components/parser/Parser.vue` — парсинг `.mid` (@tonejs/midi) и загрузка сэмплеров.
 
-## Project Setup
+### Планы: мультиплеер
+
+Каждый игрок — это свой `GameEngine` (его дорожка/инструмент) + своё поле ввода
+(мышь/клавиши). Сервер (WebSocket) рассылает `blow`-события и результаты, клиенты
+рендерят всех игроков на одном поле и озвучивают все инструменты.
+
+## Скрипты
 
 ```sh
 npm install
-```
-
-### Compile and Hot-Reload for Development
-
-```sh
-npm run dev
-```
-
-### Type-Check, Compile and Minify for Production
-
-```sh
-npm run build
+npm run dev          # разработка
+npm run build-only   # сборка (type-check на базе репы уже падал до изменений)
+npm run demo         # перегенерировать public/demo.mid
+npm run test:engine  # юнит-тесты логики игры
 ```
