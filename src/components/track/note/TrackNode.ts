@@ -1,9 +1,9 @@
-import {Note} from "@tonejs/midi/dist/Note";
+import type {Note} from "@tonejs/midi/dist/Note";
 
 export class TrackNode {
     notes: Note[];
     time: number;
-    nextNode: TrackNode;
+    nextNode?: TrackNode;
 
     constructor() {
         this.notes = [];

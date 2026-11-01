@@ -9,7 +9,8 @@
  * чтобы потом можно было добавить мультиплеер (несколько игроков/полей).
  */
 import * as PIXI from 'pixi.js';
-import { EventResult, GameNote, NoteEvent, clampMidi, midiToName } from './GameEngine';
+import { clampMidi, midiToName } from './GameEngine';
+import type { EventResult, GameNote, NoteEvent } from './GameEngine';
 
 const COLOR = {
     startDot: 0xff4fd8, // розовый кружок начала ноты
@@ -76,7 +77,6 @@ export class GameField {
 
     private views: NoteView[] = [];
     private connectors = new Map<number, PIXI.Graphics>();
-    private barTexture: PIXI.Texture;
 
     private cursorY = 0;
     private cursorLine!: PIXI.Graphics;
@@ -94,11 +94,10 @@ export class GameField {
         });
         ref.appendChild(this.app.view as unknown as HTMLCanvasElement);
 
-        this.barTexture = GameField.makeBarTexture();
-
         this.app.stage.addChild(this.bgLayer, this.gridLayer, this.notesLayer, this.fxLayer, this.cursorLayer);
 
-        this.app.stage.interactive = true;
+        this.app.stage.eventMode = 'static';
+        this.app.stage.hitArea = this.app.screen;
         this.app.stage.on('pointermove', (e: PIXI.FederatedPointerEvent) => this.onPointerMove(e));
 
         this.app.renderer.on('resize', () => this.layout());
@@ -227,6 +226,7 @@ export class GameField {
     // ---------- отрисовка ----------
 
     private layout(): void {
+        this.app.stage.hitArea = this.app.screen;
         this.drawBackground();
         this.drawGrid();
         this.drawProgress();
@@ -406,14 +406,19 @@ export class GameField {
                 v.startDot.endFill();
                 v.startDot.visible = true;
             } else {
-                // длинная нота — «труба» от начала до конца
+                // длинная нота — «труба» от начала до конца, градиент розовый→синий
                 v.bar.visible = true;
                 v.endDot.visible = true;
                 v.bar.clear();
+                const SEGMENTS = 10;
+                const width = Math.max(1, x2 - x1);
+                for (let s = 0; s < SEGMENTS; s++) {
+                    v.bar.beginFill(GameField.lerpColor(COLOR.startDot, COLOR.endDot, s / (SEGMENTS - 1)), 0.92);
+                    v.bar.drawRect(x1 + (width * s) / SEGMENTS, y - barH / 2, width / SEGMENTS + 1, barH);
+                    v.bar.endFill();
+                }
                 v.bar.lineStyle(2, 0xffffff, 0.85);
-                v.bar.beginTextureFill({ texture: this.barTexture });
-                v.bar.drawRoundedRect(x1, y - barH / 2, x2 - x1, barH, barH / 2);
-                v.bar.endFill();
+                v.bar.drawRoundedRect(x1, y - barH / 2, width, barH, barH / 2);
                 v.startDot.clear();
                 const res = v.event.result;
                 let color = COLOR.startDot;
@@ -489,17 +494,13 @@ export class GameField {
         }
     }
 
-    private static makeBarTexture(): PIXI.Texture {
-        const canvas = document.createElement('canvas');
-        canvas.width = 64;
-        canvas.height = 4;
-        const ctx = canvas.getContext('2d')!;
-        const grad = ctx.createLinearGradient(0, 0, 64, 0);
-        grad.addColorStop(0, '#ff4fd8');
-        grad.addColorStop(1, '#38c6ff');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, 64, 4);
-        return PIXI.Texture.from(canvas);
+    private static lerpColor(a: number, b: number, t: number): number {
+        const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
+        const br = (b >> 16) & 0xff, bg = (b >> 8) & 0xff, bb = b & 0xff;
+        const r = Math.round(ar + (br - ar) * t);
+        const g = Math.round(ag + (bg - ag) * t);
+        const bl = Math.round(ab + (bb - ab) * t);
+        return (r << 16) | (g << 8) | bl;
     }
 
     destroy(): void {

@@ -1,4 +1,4 @@
-import {Midi} from "@tonejs/midi";
+import type {Midi} from "@tonejs/midi";
 
 export interface MidiParser {
     parse(midi: Midi, trackNumber: Number): void;

@@ -9,12 +9,15 @@
     "build-only": "vite build",
     "type-check": "vue-tsc --noEmit -p tsconfig.app.json --composite false",
     "demo": "node scripts/gen-demo.mjs",
-    "test:engine": "node scripts/test-engine.mjs"
+    "test:engine": "node scripts/test-engine.mjs",
+    "type-check:strict": "tsc --noEmit -p tsconfig.check.json",
+    "test:page": "node scripts/test-page.mjs"
   },
   "dependencies": {
     "vue": "^3.3.4"
   },
   "devDependencies": {
+    "@sparticuz/chromium": "^153.0.0",
     "@tonejs/midi": "^2.0.28",
     "@tsconfig/node18": "^18.2.2",
     "@types/node": "^18.17.17",
@@ -22,6 +25,7 @@
     "@vue/tsconfig": "^0.4.0",
     "npm-run-all2": "^6.0.6",
     "pixi.js": "^7.3.1",
+    "puppeteer-core": "^25.16.0",
     "sass": "^1.69.5",
     "tone": "^14.7.77",
     "typescript": "~5.2.0",
