@@ -104,14 +104,23 @@ async function main() {
       return b && b.session.engine && b.session.engine.events.length > 0 && Object.keys(b.session.samplers || {}).length > 0;
     }, { timeout: 30000 });
     await sleep(1000);
-    const loaded = await page.evaluate(() => ({
-      events: window.__bard.session.engine.events.length,
-      views: window.__bard.session.field.views.length,
-      samplers: Object.keys(window.__bard.session.samplers).length,
-      tracks: document.querySelectorAll('select option').length,
-    }));
+    const loaded = await page.evaluate(() => {
+      const eng = window.__bard.session.engine;
+      const f = window.__bard.session.field;
+      return {
+        events: eng.events.length,
+        views: f.views.length,
+        spawned: f.spawnedViews,
+        totalNotes: eng.events.reduce((s, e) => s + e.notes.length, 0),
+        samplers: Object.keys(window.__bard.session.samplers).length,
+        tracks: document.querySelectorAll('select option').length,
+      };
+    });
     check('демо-midi распарсено, ноты разложены на поле', loaded.events > 0 && loaded.views > 0,
-      `событий: ${loaded.events}, нот на поле: ${loaded.views}, дорожек: ${loaded.tracks}`);
+      `событий: ${loaded.events}, нот на сцене: ${loaded.views}, дорожек: ${loaded.tracks}`);
+    check('ноты создаются лениво (стек, не все сразу на сцене)',
+      loaded.spawned > 0 && loaded.spawned < loaded.totalNotes,
+      `создано видов: ${loaded.spawned} из ${loaded.totalNotes} нот`);
     check('сэмплеры инструментов загружены', loaded.samplers > 0, `каналов: ${loaded.samplers}`);
     await page.screenshot({ path: path.join(artifacts, '02-demo-loaded.png') });
 

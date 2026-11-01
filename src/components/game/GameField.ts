@@ -38,6 +38,8 @@ interface NoteView {
     bar: PIXI.Graphics;
     startDot: PIXI.Graphics;
     endDot: PIXI.Graphics;
+    /** цифра «сколько нот в аккорде» на главной (самой низкой) ноте */
+    label: PIXI.Text | null;
 }
 
 interface JudgmentAnim {
@@ -76,7 +78,17 @@ export class GameField {
     private cursorLayer = new PIXI.Container();
 
     private views: NoteView[] = [];
-    private connectors = new Map<number, PIXI.Graphics>();
+    private connectors = new Map<number, { g: PIXI.Graphics; event: NoteEvent }>();
+    /**
+     * Ленивая загрузка: вместо того чтобы создавать все ноты на сцене сразу,
+     * храним события стеком (отсортированы по времени) и берём следующее
+     * (pop), только когда оно доехало до правого края экрана.
+     */
+    private stack: NoteEvent[] = [];
+    /** сколько видов нот создано всего (для статистики/тестов) */
+    spawnedViews = 0;
+    /** сколько видов нот осталось у события на сцене (для удаления коннектора) */
+    private eventViewsLeft = new Map<number, number>();
 
     private cursorY = 0;
     private cursorLine!: PIXI.Graphics;
@@ -122,7 +134,8 @@ export class GameField {
         }
         this.durationMs = Math.max(max, 1);
         this.clearViews();
-        this.buildViews();
+        // стек для ленивой загрузки: pop() даёт ближайшее по времени событие
+        this.stack = [...events].reverse();
         this.layout();
     }
 
@@ -168,7 +181,7 @@ export class GameField {
         this.nowMs = 0;
         this.playing = true;
         this.clearViews();
-        this.buildViews();
+        this.stack = [...this.events].reverse();
         this.layout();
     }
 
@@ -193,33 +206,72 @@ export class GameField {
             v.bar.destroy();
             v.startDot.destroy();
             v.endDot.destroy();
+            v.label?.destroy();
         }
         this.views = [];
         for (const c of this.connectors.values()) {
-            c.destroy();
+            c.g.destroy();
         }
         this.connectors.clear();
+        this.eventViewsLeft.clear();
         this.notesLayer.removeChildren();
     }
 
-    private buildViews(): void {
-        for (const event of this.events) {
-            const views: NoteView[] = [];
-            for (const note of event.notes) {
-                const bar = new PIXI.Graphics();
-                const startDot = new PIXI.Graphics();
-                const endDot = new PIXI.Graphics();
-                this.notesLayer.addChild(bar, startDot, endDot);
-                const view: NoteView = { event, note, y: this.midiToY(note.midi), bar, startDot, endDot };
-                views.push(view);
-                this.views.push(view);
+    /** Создать виды нот одного события, когда оно доехало до правого края. */
+    private spawnEventViews(event: NoteEvent): void {
+        let baseView: NoteView | null = null;
+        for (const note of event.notes) {
+            const bar = new PIXI.Graphics();
+            const startDot = new PIXI.Graphics();
+            const endDot = new PIXI.Graphics();
+            this.notesLayer.addChild(bar, startDot, endDot);
+            const view: NoteView = {
+                event,
+                note,
+                y: this.midiToY(note.midi),
+                bar,
+                startDot,
+                endDot,
+                label: null,
+            };
+            this.views.push(view);
+            this.spawnedViews++;
+            if (note.midi === event.baseMidi) {
+                baseView = view;
             }
-            if (event.notes.length > 1) {
-                // аккорд: соединяем ноты вертикальной линией (как на скриншоте)
-                const connector = new PIXI.Graphics();
-                this.notesLayer.addChildAt(connector, 0);
-                this.connectors.set(event.id, connector);
+        }
+        this.eventViewsLeft.set(event.id, event.notes.length);
+        if (event.notes.length > 1) {
+            // аккорд: соединяем ноты вертикальной линией (как на скриншоте)
+            const g = new PIXI.Graphics();
+            this.notesLayer.addChildAt(g, 0);
+            this.connectors.set(event.id, { g, event });
+            // на главной (самой низкой) ноте — цифра, сколько нот в аккорде
+            const label = new PIXI.Text(String(event.notes.length), {
+                fontFamily: 'system-ui, sans-serif',
+                fontSize: 20,
+                fontWeight: 'bold',
+                fill: 0xffffff,
+                stroke: 0x1d1d1b,
+                strokeThickness: 4,
+            });
+            label.anchor.set(0.5);
+            this.notesLayer.addChild(label);
+            if (baseView) {
+                baseView.label = label;
             }
+        }
+    }
+
+    /** Берём следующее событие из стека, только когда его пора показать. */
+    private spawnDueViews(): void {
+        const w = this.app.screen.width;
+        while (this.stack.length > 0) {
+            const event = this.stack[this.stack.length - 1];
+            if (this.xOf(event.timeMs) > w + 140) {
+                break;
+            }
+            this.spawnEventViews(this.stack.pop()!);
         }
     }
 
@@ -231,6 +283,7 @@ export class GameField {
         this.drawGrid();
         this.drawProgress();
         this.drawCursor();
+        this.spawnDueViews();
         this.moveAll();
     }
 
@@ -276,7 +329,7 @@ export class GameField {
             this.gridLayer.addChild(g);
             if (isOctave) {
                 const label = new PIXI.Text(midiToName(midi), {
-                    fontFamily: 'Baloo, sans-serif',
+                    fontFamily: 'system-ui, sans-serif',
                     fontSize: 15,
                     fill: COLOR.octaveLabel,
                 });
@@ -302,7 +355,7 @@ export class GameField {
         this.cursorLine = new PIXI.Graphics();
         this.cursorDot = new PIXI.Graphics();
         this.cursorLabel = new PIXI.Text('', {
-            fontFamily: 'Baloo, sans-serif',
+            fontFamily: 'system-ui, sans-serif',
             fontSize: 22,
             fill: COLOR.cursor,
         });
@@ -364,6 +417,7 @@ export class GameField {
             return;
         }
         this.nowMs += deltaMS;
+        this.spawnDueViews();
         this.moveAll();
         this.setProgress(this.nowMs / this.durationMs);
         this.onFrame(this.nowMs, deltaMS);
@@ -378,11 +432,30 @@ export class GameField {
             const y = v.y;
 
             if (x2 < -80) {
+                // нота ушла за левый край — убираем её со сцены
                 v.bar.destroy();
                 v.startDot.destroy();
                 v.endDot.destroy();
+                v.label?.destroy();
                 this.views.splice(i, 1);
+                const left = (this.eventViewsLeft.get(v.event.id) ?? 1) - 1;
+                if (left <= 0) {
+                    this.eventViewsLeft.delete(v.event.id);
+                    const connector = this.connectors.get(v.event.id);
+                    if (connector) {
+                        connector.g.destroy();
+                        this.connectors.delete(v.event.id);
+                    }
+                } else {
+                    this.eventViewsLeft.set(v.event.id, left);
+                }
                 continue;
+            }
+
+            // цифра аккорда едет вместе с главной нотой
+            if (v.label) {
+                v.label.x = x1;
+                v.label.y = y;
             }
 
             const barH = 20;
@@ -440,17 +513,15 @@ export class GameField {
         }
 
         // вертикальные соединители аккордов
-        for (const [eventId, connector] of this.connectors) {
-            const event = this.events.find((e) => e.id === eventId);
-            if (!event) continue;
+        for (const { g, event } of this.connectors.values()) {
             const x = this.xOf(event.timeMs);
             if (x < -80) continue;
             const yTop = this.midiToY(event.notes[event.notes.length - 1].midi);
             const yBottom = this.midiToY(event.notes[0].midi);
-            connector.clear();
-            connector.lineStyle(6, 0xffffff, 0.5);
-            connector.moveTo(x, yTop);
-            connector.lineTo(x, yBottom);
+            g.clear();
+            g.lineStyle(6, 0xffffff, 0.5);
+            g.moveTo(x, yTop);
+            g.lineTo(x, yBottom);
         }
     }
 
@@ -462,7 +533,7 @@ export class GameField {
             ? `${j.text} ${result.hitCount}/${result.noteCount}`
             : j.text;
         const text = new PIXI.Text(label, {
-            fontFamily: 'Baloo, sans-serif',
+            fontFamily: 'system-ui, sans-serif',
             fontSize: 72,
             fill: j.color,
             stroke: 0x1d1d1b,
