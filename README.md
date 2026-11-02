@@ -1,40 +1,71 @@
-# client
+# bard_village — игра на MIDI в стиле Trombone Champ
 
-This template should help get you started developing with Vue 3 in Vite.
+Клиент на Vue 3 + Vite + PixiJS + Tone.js. Можно загрузить `.mid` файл
+(или нажать **Демо** — загрузится `public/demo.mid`) и сыграть его как игру.
+Страница сделана с нуля на нативных элементах (без старых тестовых компонентов и шрифтов).
 
-## Recommended IDE Setup
+## Как играть
 
-[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur) + [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin).
+1. Загрузите `.mid` (кнопка **Загрузить .mid**) или нажмите **Демо**.
+2. Выберите дорожку (инструмент) в селекте — остальные дорожки зазвучат сами как аккомпанемент.
+3. Нажмите **Играть** (ползунок рядом — скорость прокрутки).
+4. **Мышь по вертикали** — высота, на которой вы «стоите» (нота подписана у курсора).
+5. **Любая клавиша** в момент, когда нота доехала до жёлтой линии слева, — сыграть ноту.
 
-## Type Support for `.vue` Imports in TS
+### Раскладка нот
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin) to make the TypeScript language service aware of `.vue` types.
+- По оси **X** — время проигрывания (ноты едут справа налево).
+- По оси **Y** — высота ноты, вертикально по октавам (октавы подписаны, напр. `C4`).
+- Длинные ноты — «труба» с градиентом от начала (розовый) до конца (синий); короткие — один кружок.
+- Аккорды (ноты в один момент времени) соединены вертикальной линией; на главной
+  (самой низкой) ноте аккорда — цифра, сколько нот в аккорде надо нажать.
+- **Ленивая загрузка**: ноты не создаются все сразу на сцене, а берутся из стека
+  событий (отсортированы по времени) только когда доезжают до правого края экрана,
+  и удаляются, когда ушли за левый. На длинных песнях на сцене остаются только
+  видимые ноты — поэтому нет лагов.
 
-If the standalone TypeScript plugin doesn't feel fast enough to you, Volar has also implemented a [Take Over Mode](https://github.com/johnsoncodehk/volar/discussions/471#discussioncomment-1361669) that is more performant. You can enable it by the following steps:
+### Аккорды и своя высота
 
-1. Disable the built-in TypeScript Extension
-    1) Run `Extensions: Show Built-in Extensions` from VSCode's command palette
-    2) Find `TypeScript and JavaScript Language Features`, right click and select `Disable (Workspace)`
-2. Reload the VSCode window by running `Developer: Reload Window` from the command palette.
+- Чтобы сыграть аккорд из N нот, нажмите **N клавиш** в окне попадания (±180 мс).
+- Высота аккорда отмеряется по **самой низкой ноте** аккорда.
+- Вы звучите не «как в midi», а на **своей высоте**: весь аккорд сдвигается на
+  `высота игрока − самая низкая нота аккорда`. Даже «непопавшие» ноты аккорда
+  сдвигаются на соответствующее значение.
+- Оценка: `PERFECT!` (сдвиг 0), `GOOD!` (до 2 полутонов), `NASTY!` (дальше) —
+  очки и комбо; без нажатия — `MISS`.
 
-## Customize configuration
+## Архитектура
 
-See [Vite Configuration Reference](https://vitejs.dev/config/).
+- `src/App.vue` — вся страница с нуля: загрузка файла/демо, выбор инструмента, HUD, ввод, звук.
+- `src/components/game/GameEngine.ts` — чистая логика (без Pixi/Tone): ноты midi
+  группируются в события-аккорды, принимаются нажатия (`blow`), считается
+  попадание/очки. Типы импортируются через `import type`. Готова к мультиплееру:
+  по сети можно слать только `blow` и результаты судейства.
+- `src/components/game/GameField.ts` — PixiJS-поле: фон, сетка октав, жёлтая линия,
+  ноты, курсор от мыши, всплывающие оценки, прогресс-бар.
+- `src/components/game/SamplerLoader.ts` — загрузка сэмплеров инструментов из
+  `public/sound/*.json` (Tone.Sampler; питч-шифтит сэмпл на нужную высоту).
+- `src/components/track/note/*` — работа со sf2-зонами (`NoteHandler`, `ZoneHandler`).
 
-## Project Setup
+### Планы: мультиплеер
+
+Каждый игрок — это свой `GameEngine` (его дорожка/инструмент) + своё поле ввода
+(мышь/клавиши). WebSocket-сервер рассылает `blow`-события и результаты, клиенты
+рендерят всех игроков на одном поле и озвучивают все инструменты.
+
+## Скрипты
 
 ```sh
 npm install
+npm run dev               # разработка
+npm run build-only        # сборка
+npm run type-check:strict # строгая проверка типов всех TS-файлов (tsc --strict)
+npm run demo              # перегенерировать public/demo.mid
+npm run test:engine       # юнит-тесты логики игры (GameEngine)
+npm run test:page         # автотест страницы в headless Chromium: сборка + проверка,
+                          # что главная страница открывается без ошибок в консоли,
+                          # демо грузится, игра идёт, очки начисляются (скриншоты в artifacts/)
 ```
 
-### Compile and Hot-Reload for Development
-
-```sh
-npm run dev
-```
-
-### Type-Check, Compile and Minify for Production
-
-```sh
-npm run build
-```
+`test:page` использует `puppeteer-core` + `@sparticuz/chromium` (headless Chromium
+из npm-пакета, WebGL через SwiftShader) и поднимает статический сервер поверх `dist/`.

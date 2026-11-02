@@ -1,23 +1,18 @@
 import {zoneFilesList} from "@/components/track/note/ZoneHandler.ts";
-import {Midi} from "@tonejs/midi";
-import {Note} from "@tonejs/midi/dist/Note";
-import {ZoneType} from "@/components/track/note/ZoneType";
+import type {Midi} from "@tonejs/midi";
+import type {Note} from "@tonejs/midi/dist/Note";
+import type {ZoneType} from "@/components/track/note/ZoneType";
+import type {BaseContext} from "tone";
 
-export async function getZonesByMidiInstrumentNumber(midiNumber: number): Promise<ZoneType[]> {
-    const zones = await getZoneDataByMidiNumber(midiNumber * 10)
-    if (zones !== undefined) {
-        return zones;
-    }
+export async function getZonesByMidiInstrumentNumber(midiNumber: number): Promise<ZoneType[] | undefined> {
+    return getZoneDataByMidiNumber(midiNumber * 10);
 }
 
-export async function getZonesByMidiDrumsNumber(midiNumber: number): Promise<ZoneType[]> {
-    const zones = await getZoneDataByMidiNumber(midiNumber)
-    if (zones !== undefined) {
-        return zones;
-    }
+export async function getZonesByMidiDrumsNumber(midiNumber: number): Promise<ZoneType[] | undefined> {
+    return getZoneDataByMidiNumber(midiNumber);
 }
 
-export async function getZoneDataByMidiNumber(midiNumber: number) {
+export async function getZoneDataByMidiNumber(midiNumber: number): Promise<ZoneType[] | undefined> {
     const needle = midiNumber.toString().padStart(4,'0') + '_';
     for (const key in zoneFilesList) {
         if (key.includes(needle)) {
@@ -28,7 +23,7 @@ export async function getZoneDataByMidiNumber(midiNumber: number) {
     return undefined;
 }
 
-export function getRealChannel(channel: number, note = undefined): number {
+export function getRealChannel(channel: number, note?: Note): number {
     if (channel !== 9 || note === undefined) {
         return channel;
     }
@@ -36,7 +31,7 @@ export function getRealChannel(channel: number, note = undefined): number {
 }
 
 export function getAllNotesFromChannel(channel: number, midi: Midi): Note[] {
-    const result = [];
+    const result: Note[] = [];
     midi.tracks.forEach((track) => {
         if (track.channel === channel) {
             track.notes.forEach((note) => {
@@ -47,17 +42,17 @@ export function getAllNotesFromChannel(channel: number, midi: Midi): Note[] {
     return result;
 }
 
-export async function getMappedNotesFromZones(audioContext, zones) {
-    const map = {}
-    for (let zone of zones) {
-        const baseDetune = Math.round( (zone.originalPitch - 100.0 * zone.coarseTune - zone.fineTune) / 100);
-        map[baseDetune] = await getAudioBufferFromZone(audioContext, zone);
+export async function getMappedNotesFromZones(audioContext: BaseContext, zones: ZoneType[]): Promise<Record<number, AudioBuffer>> {
+    const map: Record<number, AudioBuffer> = {};
+    for (const zone of zones) {
+        const baseDetune = Math.round((zone.originalPitch - 100.0 * zone.coarseTune - zone.fineTune) / 100);
+        map[baseDetune] = await getAudioBufferFromZone(audioContext, zone) as AudioBuffer;
     }
     return map;
 }
 
-export async function getAudioBufferFromZone(audioContext, zone) {
-    let buffer = null;
+export async function getAudioBufferFromZone(audioContext: BaseContext, zone: ZoneType): Promise<AudioBuffer | null> {
+    let buffer: AudioBuffer | null = null;
     if (zone.buffer) {
         buffer = zone.buffer;
     } else {

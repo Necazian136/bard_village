@@ -1,4 +1,4 @@
-export const zoneFilesList = {
+export const zoneFilesList: Record<string, string> = {
     '0000_Aspirin_sf2_file': '/sound/0000_Aspirin_sf2_file.json',
     '0000_Chaos_sf2_file': '/sound/0000_Chaos_sf2_file.json',
     '0000_FluidR3_GM_sf2_file': '/sound/0000_FluidR3_GM_sf2_file.json',
